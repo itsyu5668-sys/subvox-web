@@ -1,0 +1,13 @@
+# Subvox Web — FastAPI backend (torch CPU) + vendored lip-reading code.
+# Installed in two steps to mirror local dev: torch from the PyTorch CPU
+# index first, everything else from PyPI.
+fastapi>=0.115
+uvicorn[standard]>=0.30
+python-multipart
+opencv-python-headless
+mediapipe==0.10.21
+numpy<2
+sentencepiece
+llama-cpp-python
+six
+requests
