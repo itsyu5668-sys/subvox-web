@@ -8,6 +8,8 @@ opencv-python-headless
 mediapipe==0.10.21
 numpy<2
 sentencepiece
-llama-cpp-python
+# NOTE: llama-cpp-python is installed from the project's prebuilt
+# manylinux wheel (GitHub release) in the Dockerfile — PyPI ships
+# sdist-only for 0.3.36 and a source build is slow/OOM-prone here.
 six
 requests
