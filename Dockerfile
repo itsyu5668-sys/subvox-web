@@ -22,6 +22,11 @@ WORKDIR /app
 
 COPY requirements.txt ./
 RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+# llama-cpp-python ships NO wheels on PyPI (sdist-only) — a source build
+# is slow and OOM-prone on small builders. Use the project's own prebuilt
+# manylinux wheel from its GitHub release instead (same version, 0.3.36).
+RUN pip install --no-cache-dir \
+    https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.36/llama_cpp_python-0.3.36-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
