@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light" />
+<link rel="icon" href="data:," />
+<title>Subvox Web — Train first, then dictate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="sunset" aria-hidden="true"></div>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#" onclick="return false">
+      <span class="brand-mark" aria-hidden="true">&#9679;</span>
+      <span class="brand-word">Subvox <span>web</span></span>
+    </a>
+    <nav class="tabs" role="tablist" aria-label="Subvox screens">
+      <button class="tab" role="tab" data-screen="train" aria-selected="true">1 &middot; Train</button>
+      <button class="tab" role="tab" data-screen="test" aria-selected="false">2 &middot; Test</button>
+      <button class="tab" role="tab" data-screen="dictate" aria-selected="false">3 &middot; Dictate</button>
+      <button class="tab" role="tab" data-screen="doctor" aria-selected="false">4 &middot; Models</button>
+    </nav>
+    <span class="status-pill" id="apiStatus" title="Backend health"><span class="dot"></span><span id="apiStatusText">checking API&hellip;</span></span>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <h1>Train it on your mouth first. Then it can hear you.</h1>
+    <p class="hero-sub">Subvox reads lips, silently. Ten Harvard sentences, three takes each,
+      and the stock model adapts to how you mouth words. No audio is ever recorded.</p>
+    <div class="hero-steps" id="heroSteps">
+      <span class="step-chip" id="chipTrain"><b>1</b> Train &middot; <span id="chipTrainState">not started</span></span>
+      <span class="step-chip" id="chipTest"><b>2</b> Test &middot; <span id="chipTestState">not run</span></span>
+      <span class="step-chip" id="chipDictate"><b>3</b> Dictate &middot; <span id="chipDictateState">locked until trained</span></span>
+    </div>
+  </section>
+
+  <!-- ================= SCREEN 1: TRAIN ================= -->
+  <section class="screen active" id="screen-train" role="tabpanel" aria-label="Train">
+    <div class="card">
+      <div class="row-between">
+        <div>
+          <h2>Train on your mouth</h2>
+          <p class="lede">Mouth each sentence silently, three times. Stage 1 is six sentences
+            (about two minutes of mouthing). Stage 2 adds the last four in the background
+            while you use the app.</p>
+        </div>
+        <span class="verdict" id="trainStageLabel">Stage 1 of 2 &middot; Quick adapt</span>
+      </div>
+
+      <div class="grid-2" style="margin-top:24px">
+        <div>
+          <div class="camera-wrap" id="cameraWrap">
+            <div class="camera-off" id="cameraOff">
+              Camera is off.<br />Press &ldquo;Start camera&rdquo; and allow access in your browser.
+            </div>
+            <video id="camVideo" autoplay muted playsinline style="display:none"></video>
+            <div class="mouth-guide" id="mouthGuide" style="display:none"></div>
+            <span class="rec-indicator" id="recIndicator"><span class="dot"></span><span id="recTimer">0:00</span> recording</span>
+          </div>
+          <div class="mouth-preview">
+            <canvas id="mouthCanvas" width="96" height="96"></canvas>
+            <p><b style="color:var(--ink)">Mouth crop preview &middot; 96&times;96.</b><br />
+              This is the framing the model sees. It is a fixed crop of the lower centre of
+              the frame &mdash; a guide, not face tracking. The backend does the real crop.
+              Keep your mouth inside the dashed box.</p>
+          </div>
+          <div class="row" style="margin-top:16px">
+            <button class="btn btn-espresso" id="btnStartCam">Start camera</button>
+            <button class="btn btn-ghost" id="btnStopCam" disabled>Stop camera</button>
+          </div>
+          <div class="notice" id="camNotice"></div>
+        </div>
+
+        <div>
+          <p class="sentence-count" id="sentenceCount">Sentence 1 of 10 &middot; Stage 1</p>
+          <p class="sentence-big" id="currentSentence">The birch canoe slid on the smooth planks</p>
+          <div class="take-dots" id="takeDots">
+            <button class="take-dot" data-take="0" title="Take 1">1</button>
+            <button class="take-dot" data-take="1" title="Take 2">2</button>
+            <button class="take-dot" data-take="2" title="Take 3">3</button>
+          </div>
+          <p class="small muted" style="text-align:center">Tap a take, then hold the record button and mouth the sentence silently.</p>
+          <div class="row" style="justify-content:center; margin-top:16px">
+            <button class="btn btn-espresso btn-large" id="btnRecordTake" disabled>Hold to record take</button>
+          </div>
+          <div class="row" style="justify-content:center; margin-top:12px">
+            <button class="btn btn-ghost" id="btnPrevSentence">&larr; Previous</button>
+            <button class="btn btn-ghost" id="btnNextSentence">Next sentence &rarr;</button>
+          </div>
+          <div class="progress-track"><div class="progress-fill" id="trainProgressFill"></div></div>
+          <p class="small muted" id="trainProgressText">0 of 30 takes recorded</p>
+          <div class="notice" id="trainNotice"></div>
+        </div>
+      </div>
+
+      <div class="sentence-list" id="sentenceList"></div>
+
+      <div class="row" style="margin-top:24px">
+        <button class="btn btn-espresso btn-large" id="btnUploadTrain" disabled>Upload takes &amp; start training</button>
+        <button class="btn btn-ghost" id="btnClearTakes">Clear all takes</button>
+      </div>
+      <p class="small muted" style="margin-top:10px">Upload needs all 30 takes (10 sentences &times; 3). Stage 1 trains on
+        sentences 1, 3, 5, 6, 9 and 10 first; sentences 2, 4, 7 and 8 follow as Stage 2.
+        Training runs on the server and can take minutes on CPU &mdash; progress is shown as the server reports it.</p>
+
+      <div id="trainJob" style="display:none; margin-top:24px">
+        <h3>Training progress</h3>
+        <div class="progress-track"><div class="progress-fill" id="jobProgressFill"></div></div>
+        <p class="small muted" id="jobProgressText">Waiting for the server&hellip;</p>
+        <p class="mono" id="jobLossText"></p>
+      </div>
+
+      <div id="trainResult" style="display:none; margin-top:24px">
+        <h3>Adapted vs stock &mdash; held-out sentences</h3>
+        <div class="kpi-row">
+          <div class="kpi"><div class="label">Stock model WER</div><div class="value" id="werStock">&mdash;</div><div class="sub">word error rate, lower is better</div></div>
+          <div class="kpi"><div class="label">Adapted model WER</div><div class="value" id="werAdapted">&mdash;</div><div class="sub">after training on your mouth</div></div>
+          <div class="kpi"><div class="label">Improvement</div><div class="value" id="werDelta">&mdash;</div><div class="sub" id="werDeltaSub">held-out sentences only</div></div>
+          <div class="kpi"><div class="label">Adapted model kept?</div><div class="value" id="werKept">&mdash;</div><div class="sub">decided by the server, or by you below</div></div>
+        </div>
+        <div class="row" style="margin-top:16px">
+          <button class="btn btn-espresso" id="btnKeepAdapted">Keep adapted model</button>
+          <button class="btn btn-ghost" id="btnDiscardAdapted">Discard &mdash; keep stock</button>
+        </div>
+        <div class="notice" id="keepNotice"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SCREEN 2: TEST ================= -->
+  <section class="screen" id="screen-test" role="tabpanel" aria-label="Test">
+    <div class="card">
+      <h2>Test on a sentence you never trained on</h2>
+      <p class="lede">Known sentence, three takes. Each run is scored against the exact text,
+        so the numbers are honest. Every test is logged below &mdash; stock vs adapted WER and latency.</p>
+
+      <div class="grid-2" style="margin-top:24px">
+        <div>
+          <div class="camera-wrap">
+            <div class="camera-off" id="testCameraOff">Camera is shared with the Train screen.<br />Start it there first.</div>
+            <video id="testVideo" autoplay muted playsinline style="display:none"></video>
+          </div>
+          <p class="small muted" style="margin-top:10px">The test sentence is fixed so results are comparable across runs.</p>
+        </div>
+        <div>
+          <p class="sentence-count">Known sentence &middot; 3 takes</p>
+          <p class="sentence-big" id="testSentence">The birch canoe slid on the smooth planks</p>
+          <div class="take-dots" id="testTakeDots">
+            <button class="take-dot" data-take="0">1</button>
+            <button class="take-dot" data-take="1">2</button>
+            <button class="take-dot" data-take="2">3</button>
+          </div>
+          <div class="row" style="justify-content:center; margin-top:16px">
+            <button class="btn btn-espresso btn-large" id="btnRecordTest" disabled>Hold to record test take</button>
+          </div>
+          <div class="notice" id="testNotice"></div>
+          <div id="testRunResults" style="margin-top:16px"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row-between">
+        <h3>Test log</h3>
+        <button class="btn btn-ghost" id="btnClearLog">Clear log</button>
+      </div>
+      <p class="small muted">Stored in this browser only. Nothing leaves your machine except the video sent to the API for scoring.</p>
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Sentence</th><th>Model</th><th>Stock WER</th><th>Adapted WER</th><th>Latency</th><th>Raw output</th></tr>
+        </thead>
+        <tbody id="testLogBody">
+          <tr><td colspan="7" class="muted">No tests yet. Run one above.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ================= SCREEN 3: DICTATE ================= -->
+  <section class="screen" id="screen-dictate" role="tabpanel" aria-label="Dictate">
+    <div class="card">
+      <h2>Dictate, silently</h2>
+      <p class="lede">Hold to talk, release to transcribe. Your live transcript builds up below.
+        Paste a target sentence to check accuracy against it &mdash; the comparison is computed
+        locally in your browser, never sent anywhere.</p>
+
+      <div class="grid-2" style="margin-top:24px">
+        <div>
+          <div class="camera-wrap">
+            <div class="camera-off" id="dictateCameraOff">Camera is shared with the Train screen.<br />Start it there first.</div>
+            <video id="dictateVideo" autoplay muted playsinline style="display:none"></video>
+          </div>
+          <div class="row" style="margin-top:16px">
+            <button class="hold-btn" id="btnHoldTalk" disabled>Hold to talk</button>
+          </div>
+          <p class="small muted" style="text-align:center; margin-top:8px">Hold the button (or hold Space) while mouthing. Release to send.</p>
+          <div class="notice" id="dictateNotice"></div>
+        </div>
+        <div>
+          <label for="targetText">Target text (optional &mdash; paste what you mouthed to check accuracy)</label>
+          <textarea id="targetText" placeholder="Paste the sentence you mouthed&hellip;"></textarea>
+          <div class="row" style="margin-top:8px">
+            <button class="btn btn-ghost" id="btnClearTarget">Clear target</button>
+            <span class="small muted" id="targetWer"></span>
+          </div>
+          <h3 style="margin-top:20px">Live transcript</h3>
+          <div class="transcript" id="liveTranscript"><span class="placeholder">Nothing dictated yet. Hold to talk and mouth a sentence.</span></div>
+          <div id="lastRun" style="display:none; margin-top:16px">
+            <h3>Last run</h3>
+            <div class="kpi-row">
+              <div class="kpi"><div class="label">Raw model output</div><div class="value small" id="lastRaw" style="font-size:15px; letter-spacing:0">&mdash;</div></div>
+              <div class="kpi"><div class="label">Cleaned (language model)</div><div class="value small" id="lastCleaned" style="font-size:15px; letter-spacing:0">&mdash;</div></div>
+              <div class="kpi"><div class="label">Latency</div><div class="value" id="lastLatency">&mdash;</div></div>
+            </div>
+            <h3 style="margin-top:16px">Top 3 hypotheses</h3>
+            <div id="hypotheses"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SCREEN 4: MODELS / DOCTOR ================= -->
+  <section class="screen" id="screen-doctor" role="tabpanel" aria-label="Models and doctor">
+    <div class="banner">
+      <b>Research use only.</b> Subvox is built on LRS3, a research dataset licensed for
+      <b>non-commercial research only</b>. This build is for personal research and evaluation.
+      Do not use it commercially, do not redistribute the models, and do not present it as a
+      commercial product. Model weights remain the property of their original licensors.
+    </div>
+
+    <div class="card">
+      <div class="row-between">
+        <h2>Models &amp; system check</h2>
+        <button class="btn btn-ghost" id="btnRefreshDoctor">Re-run doctor</button>
+      </div>
+      <p class="lede">Live data from <span class="mono">GET /doctor</span>. If the server cannot be
+        reached, this screen says so &mdash; it never shows placeholder numbers as if they were real.</p>
+      <div class="notice" id="doctorNotice"></div>
+      <div id="doctorContent" style="display:none">
+        <dl class="kv" id="doctorKv"></dl>
+        <h3 style="margin-top:24px">Models on disk</h3>
+        <table>
+          <thead><tr><th>Model</th><th>Size</th><th>Status</th><th>Notes</th></tr></thead>
+          <tbody id="modelTableBody"></tbody>
+        </table>
+        <h3 style="margin-top:24px">Raw doctor output</h3>
+        <pre class="dump" id="doctorDump"></pre>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Language model training</h3>
+      <p class="lede">The lip model produces raw text; a small language model cleans it up
+        (grammar, word choice). Train it on your own sentences with
+        <span class="mono">POST /train-lm</span> &mdash; paste one sentence per line.</p>
+      <label for="lmText" style="margin-top:16px">Your sentences (one per line)</label>
+      <textarea id="lmText" rows="5" placeholder="The birch canoe slid on the smooth planks&#10;Four hours of steady work faced us"></textarea>
+      <div class="row" style="margin-top:12px">
+        <button class="btn btn-espresso" id="btnTrainLm">Train language model</button>
+      </div>
+      <div class="notice" id="lmNotice"></div>
+    </div>
+
+    <div class="settings">
+      <h3>API settings</h3>
+      <p class="small muted">The frontend calls the backend at this base URL. Default is same-origin
+        <span class="mono">/api</span> (the FastAPI server serves these files and proxies its own API under /api).
+        Change it only if the backend runs somewhere else.</p>
+      <div class="row" style="margin-top:12px">
+        <input type="url" id="apiBaseInput" value="/api" spellcheck="false" />
+        <button class="btn btn-ghost" id="btnSaveApiBase">Save &amp; re-check</button>
+      </div>
+      <p class="small muted" style="margin-top:8px">You can also set it with a query string: <span class="mono">?api=http://localhost:8000</span>,
+        or before load: <span class="mono">window.SUBVOX_API_BASE</span>.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  Subvox Web &middot; silent lip-reading dictation, training first.<br />
+  <span class="small">LRS3 research-only licence applies. No audio is recorded, ever.</span>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
